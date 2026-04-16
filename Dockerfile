@@ -2,7 +2,7 @@ FROM node:lts-trixie-slim AS base
 ARG USER_UID=1000
 ARG USER_GID=1000
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates gosu curl git wget ripgrep python3 \
+  && apt-get install -y --no-install-recommends ca-certificates gosu curl git wget ripgrep python3 zip unzip \
   && mkdir -p -m 755 /etc/apt/keyrings \
   && wget -nv -O/etc/apt/keyrings/githubcli-archive-keyring.gpg https://cli.github.com/packages/githubcli-archive-keyring.gpg \
   && echo "20e0125d6f6e077a9ad46f03371bc26d90b04939fb95170f5a1905099cc6bcc0  /etc/apt/keyrings/githubcli-archive-keyring.gpg" | sha256sum -c - \
@@ -58,6 +58,17 @@ COPY --chown=node:node --from=build /app /app
 RUN npm install --global --omit=dev @anthropic-ai/claude-code@latest @openai/codex@latest opencode-ai \
   && mkdir -p /paperclip \
   && chown node:node /paperclip
+
+# Install sdkman and JDKs for multi-project support (e.g. backend_taxiapp requires Java 8)
+ENV SDKMAN_DIR=/opt/sdkman
+RUN curl -s "https://get.sdkman.io" | bash \
+    && bash -c "source /opt/sdkman/bin/sdkman-init.sh \
+        && sdk install java 8.0.482-zulu < /dev/null \
+        && sdk install java 21.0.10-tem < /dev/null \
+        && sdk default java 21.0.10-tem" \
+    && chmod -R o+rx /opt/sdkman \
+    && echo 'export SDKMAN_DIR=/opt/sdkman' >> /etc/bash.bashrc \
+    && echo '[[ -s /opt/sdkman/bin/sdkman-init.sh ]] && source /opt/sdkman/bin/sdkman-init.sh' >> /etc/bash.bashrc
 
 COPY scripts/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
